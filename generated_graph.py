@@ -21,7 +21,7 @@ class GeneratedGraph(object):
     __metaclass__ = ABCMeta
     f = plt.figure(figsize=(7, 7), dpi=100)
     sp = f.add_subplot(111)
-    no_of_nodes = 50
+    no_of_nodes = 1000
     
     def __init__(self):
         self.generate_nodes()
@@ -35,15 +35,15 @@ class GeneratedGraph(object):
                     self.connect_nodes(node1, node2)
                     
         self.find_largest_connected_graph()
-        checked_nodes = []
-        for node1 in self.nodes:
-            checked_nodes.append(node1)
-            for node2 in self.nodes:
-                if node2 in checked_nodes:
-                    continue
-                if node2 in node1.neighbors:
-#                     self.connect_nodes(node1, node2)
-                    self.draw_connected_nodes(node1, node2)
+#         checked_nodes = []
+#         for node1 in self.nodes:
+#             checked_nodes.append(node1)
+#             for node2 in self.nodes:
+#                 if node2 in checked_nodes:
+#                     continue
+#                 if node2 in node1.neighbors:
+# #                     self.connect_nodes(node1, node2)
+#                     self.draw_connected_nodes(node1, node2)
     
     def generate_nodes(self):
         self.nodes = [Node(i) for i in range(0, self.no_of_nodes)]
@@ -67,7 +67,7 @@ class GeneratedGraph(object):
         self.sp.plot([node1.x, node2.x], [node1.y, node2.y], color+"-", lw=0.2)
     
     def find_highest_degree(self):
-        return max(self.nodes, key=lambda x: len(x.neighbors))
+        return max([node for node in self.nodes if node.visited != True], key=lambda x: len(x.neighbors))
     
     def bfs(self):
         q = [self.find_highest_degree()]
@@ -80,32 +80,31 @@ class GeneratedGraph(object):
                     q.append(node)
                     node.visited = True
                     nodes.add(node)
-#         print nodes
+        self.set_visited_flag(self.nodes, False)
         return nodes
     
     def find_largest_connected_graph(self):
         to_throw = set(self.nodes) - self.bfs()
-#         print set(self.nodes) - self.bfs(), len(set(self.nodes) - self.bfs())
         self.nodes = [node for node in self.nodes if not node in to_throw]
         print len(self.nodes)
-
-
-#     def remove_node(self, node, from_whom):
-#         for neighbor in node.neighbors:
-#             if neighbor is not from_whom:
-#                 print neighbor.number
-#                 self.remove_node(neighbor, node)
-#             self.draw_connected_nodes(neighbor, node, color="C1")
-#             try:
-#                 self.nodes.remove(node)
-#             except:
-#                 pass
-#         self.draw_nodes(node, color="C3")
-#         self.draw_nodes(node.neighbors, color="C1")
+        
+    def disable_nodes(self, q):
+        attacked_nodes = random.sample(self.nodes, int(q*len(self.nodes)))
+        self.set_visited_flag(attacked_nodes, True)
+        return len([node for node in self.nodes if node.visited == True])
+        
+    def set_visited_flag(self, nodes, flag):
+        map(lambda x: setattr(x, "visited", flag), nodes)
+        
+    def make_an_attack(self,q):
+        no_of_attacked = self.disable_nodes(q)
+        connected_graph = self.bfs()
+        print len(self.nodes), no_of_attacked, len(connected_graph)
+        return len(self.nodes) - no_of_attacked == len(connected_graph)
         
         
 class BernoulliGraph(GeneratedGraph):
-    r = 0.15
+    r = 0.05
     
     def calc_dist(self, node1, node2):
         return math.sqrt(math.pow(node1.x-node2.x, 2)+math.pow(node1.y-node2.y, 2))
