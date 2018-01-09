@@ -2,9 +2,11 @@ import random
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import json
+import datetime
 from matplotlib.figure import Figure
 from scipy.stats import bernoulli
-from abc import ABCMeta, abstractmethod
+import os
 
 class Node(object):
     def __init__(self, number):
@@ -17,51 +19,90 @@ class Node(object):
     def __repr__(self):
         return "%s, %s, nr = %s" % (self.x, self.y, self.number)
 
+
 class GeneratedGraph(object):
-    __metaclass__ = ABCMeta
-    f1 = plt.figure(figsize=(10, 10), dpi=100)
-    f2 = plt.figure(figsize=(10, 10), dpi=100)
-    f3 = plt.figure(figsize=(10, 10), dpi=100)
-    sp1 = f1.add_subplot(111)
-    sp2 = f2.add_subplot(111)
-    sp3 = f3.add_subplot(111)
     faded_alpha = 0.3
-#     no_of_nodes = 100
     
-    def __init__(self, stat, no_of_nodes = 100, nodes = None, draw_flag = None):
+    def __init__(self, stat = None, no_of_nodes = 100, load_graph = None, draw_flag = None):
+        self.nodes_to_save = no_of_nodes
+        if draw_flag:
+            self.f1 = plt.figure(figsize=(10, 10), dpi=100)
+            self.f2 = plt.figure(figsize=(10, 10), dpi=100)
+            self.f3 = plt.figure(figsize=(10, 10), dpi=100)
+            self.sp1 = self.f1.add_subplot(111)
+            self.sp2 = self.f2.add_subplot(111)
+            self.sp3 = self.f3.add_subplot(111)
+        else:
+            self.sp1 = None
+            self.sp2 = None
+            self.sp3 = None
         self.no_of_nodes = no_of_nodes
         self.draw_flag = draw_flag
-        if nodes:
-            self.nodes = nodes
+        if load_graph:
+            self.load_nodes_from_file(load_graph)
         else:
             self.generate_nodes()
+# #         print 'nodes generated'
         self.stat = stat
         self.draw_nodes(self.sp1, self.nodes, alpha=1.0)
-        checked_nodes = []
-        for node1 in self.nodes:
-            checked_nodes.append(node1)
-            for node2 in self.nodes:
-                if node2 in checked_nodes:
-                    continue
-                if self.check_connection(node1, node2):
-                    self.connect_nodes(node1, node2)
-                    self.draw_connected_nodes(self.sp1, node1, node2, color="C0")
-                    
-        self.draw_nodes(self.sp2, self.nodes, alpha=0.1)
-        
+        if load_graph is None:
+            for i in  range(0, len(self.nodes)):
+                node1 = self.nodes[i]
+                if i % 1000 == 0:
+                    print i
+                for j in range(i, len(self.nodes)):
+                    node2 = self.nodes[j]
+                    if self.check_connection(node1, node2):
+                        self.connect_nodes(node1, node2)
+                        self.draw_connected_nodes(self.sp1, node1, node2, color="C0")
+#             print 'lol'
+            self.draw_nodes(self.sp2, self.nodes, alpha=0.1)
+            
+        else:
+            for i in range(0, len(self.nodes)):
+                node1 = self.nodes[i]
+                for j in range(i, len(self.nodes)):
+                    node2 = self.nodes[j]
+                    if node1.number in node2.neighbors:
+                        self.connect_nodes(node1, node2)
+                node1.neighbors = [el for el in  node1.neighbors if not isinstance(el, int)]
+    
         self.no_of_edges = 0
         self.nodes = self.find_largest_connected_graph()
-        checked_nodes = []
-        for node1 in self.nodes:
-            checked_nodes.append(node1)
-            for node2 in self.nodes:
-                if node2 in checked_nodes:
-                    continue
+        for i in  range(0, len(self.nodes)):
+            node1 = self.nodes[i]
+            for j in range(i, len(self.nodes)):
+                node2 = self.nodes[j]
                 if node2 in node1.neighbors:
                     self.draw_connected_nodes(self.sp2, node1, node2, color="C1")
                     self.no_of_edges += 1
         self.draw_nodes(self.sp2, self.nodes, color="C1")
     
+    @staticmethod
+    def to_dict(node):
+        return {"number": node.number, "x": node.x, "y": node.y, "neighbors": [el.number for el in node.neighbors]}
+    
+    @staticmethod
+    def from_dict(nodes_dict):
+        n = Node(nodes_dict["number"])
+        n.x = nodes_dict["x"]
+        n.y = nodes_dict["y"]
+        n.neighbors = nodes_dict["neighbors"]
+        return n
+    
+    def load_nodes_from_file(self, nodes_file):
+        with open(nodes_file, "r") as f:
+            nodes = [GeneratedGraph.from_dict(el) for el in json.load(f)]
+        self.nodes = nodes
+        self.no_of_nodes = len(nodes)
+    
+    def write_nodes_to_file(self, directory = "graphs", filename = None):
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        if not filename:
+            filename = self.__class__.__name__+"_"+str(self.nodes_to_save)+"_"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")+".graph"
+        with open(os.path.join(directory, filename), "w+") as f:
+            json.dump([GeneratedGraph.to_dict(el) for el in nodemap.nodes], f)
     
     def generate_nodes(self):
         self.nodes = [Node(i) for i in range(0, self.no_of_nodes)]
@@ -75,7 +116,7 @@ class GeneratedGraph(object):
             nodes = [nodes]
         fig.plot([el.x for el in nodes], [el.y for el in nodes], 'o', alpha=alpha, color=color, markersize=2)
     
-    @abstractmethod
+#     @abstractmethod
     def check_connection(self, node1, node2):
         pass
         
@@ -111,7 +152,8 @@ class GeneratedGraph(object):
             largest_connected_graph = self.bfs()
             to_throw = set(self.nodes) - self.bfs()
             self.nodes = [node for node in self.nodes if not node in to_throw]
-        print len(largest_connected_graph)
+            self.no_of_nodes = len(self.nodes)
+#         print len(largest_connected_graph)
         return list(largest_connected_graph)
         
     def disable_nodes(self, q):
@@ -127,9 +169,7 @@ class GeneratedGraph(object):
         no_of_attacked = self.disable_nodes(q)
         self.draw_attacked_graph(self.sp3, self.nodes)
         connected_graph = self.bfs()
-#         self.draw_nodes(list(connected_graph), color="C5")
-        print len(self.nodes), no_of_attacked, len(connected_graph)
-        return len(self.nodes) - no_of_attacked != len(connected_graph)
+        return len(self.nodes), no_of_attacked, len(connected_graph), len(self.nodes) - no_of_attacked != len(connected_graph)
     
     def draw_attacked_graph(self, fig, nodes):
         if not self.draw_flag:
@@ -139,8 +179,6 @@ class GeneratedGraph(object):
         checked_nodes = []
         for node1 in nodes:
             checked_nodes.append(node1)
-#             if node1.visited:
-#                 continue
             for node2 in self.nodes:
                 if node2 in checked_nodes:
                     continue
